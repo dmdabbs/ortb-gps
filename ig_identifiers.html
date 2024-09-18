@@ -3,148 +3,7 @@
 <head>
 </head>    
 <body>
-
-    <div id="adslot">        
-    </div>
-
-    <p>
-        This "working model" demo merges an ACE Preview url, bits from my tinkering using AWS over the past year, August-vintage Criteo bidder code and seller code from <a href="https://www.privacysandboxdemos.com/" target="_new">the nice PAAPI demo</a> Index Exchange open sourced.
-        <br>Most has been annotated with excerpts from, and links to, the relevant explainers.
-        <br>Fenced Frames Reporting in the creative needs to be demonstrated.
-        <br>Quick and dirty colorized code (from GitHub gists) for this page (IG join and auction) and the buyer's bidding logic are below.
-        <br>Copy/paste to your editor of choice for better readability.
-        <br>
-        <br>David 🤓
-        <br>
-        <br><b>Adjusting Auction Config or Behavior</b> 
-        <p>
-            Ad slot defaults to Medium Rect (300x250). To set a different size, load the page with parameter <code>&requestedSize=WIDTHxHEIGHT</code>, that is<br>
-            <code>https://www.mojotest.com/~davidd/fledge/annotated_demo.html?&requestedSize=468x60</code>.
-            <br>
-            <br>
-            Default component auction buyer is <code>usadmm.dotomi.com</code>. To override,<br>
-            load the page with parameter e.g. <code>&interestGroupBuyers=td.dabbs.net</code> (the buyer without the https://)
-            <br>
-            <br>Want to see your submitted bid get rejected, forcing loss behavior?
-            <br>Load the page with parameter <code>&rejectReason=<i>reason</i></code> (from the <a href="https://github.com/WICG/turtledove/blob/main/FLEDGE.md#711-post-auction-signals">list</a> provided in the FLEDGE explainer, e.g. <code>pending-approval-by-exchange</code>)
-            <br>
-            <br>
-            To render the ad in a fencedframe, load this page with parameter <code>&resolveToConfig=true</code><br>
-            Otherwise, the ad will render in an iframe. 
-            <br>
-            <br>
-            To NOT (re) join the test IGs, specify <i>&noJoin</i>.
-            <br>
-            <br>
-            To run Chrome with one of the test labels (here label_only_5) run CHrome with a command line flag:<br>
-            --enable-features=CookieDeprecationFacilitatedTesting:label/label_only_5/force_eligible/true
-        </p>
-        <br>
-        <br>References
-        <br><a href="https://en.wikipedia.org/wiki/Privacy_Sandbox">Wikipedia Privacy Sandbox</a>
-        <br><a href="https://privacysandbox.com/">Google's Privacy Sandbox site</a>
-        <br><a href="https://github.com/WICG/turtledove/blob/main/FLEDGE.md">Protected Audience API (PAAPI, fka FLEDGE) explainer on GitHub</a>
-        <br><a href="https://developers.google.com/privacy-sandbox/relevance/protected-audience">Google Developer Relations PAAPI content</a>
-        <br>
-        
-        <br>
-        <br>To see what's going on, open DevTools to the <em>Application</em> panel, and select <em>Interest Groups</em> on the left. 
-        <br>Reload the page and you will be able to observe both the IG events and the Console.
-        <br>Sometimes the buyer's <em>reportWin</em> console output gets nested under the component seller's <em>reportResult</em> console entry.
-        <br>
-        <br><img src="devtools.jpg"/>
-    </p>
     <script>
-
-/*
-        (16 Feb 24, Matt Menke, Google)
-        General note about PA request timeouts 
-
-        All Protected Audience requests, including updates, have 30 second timeouts by default. Note that update requests, 
-        in particular, are headless requests (they're not associated with a frame, and there's no way for the user to cancel them), 
-        so we don't want to risk them going on for a long period of time, consuming system resources. Reporting requests are similarly 
-        headless - the sendReportTo() requests also have a 30 second timeout.
-
-        It looks to me like event-level or aggregate reports sent using beacons 
-        (which are more a fenced frames thing rather than a Protected Audience thing) 
-        don't currently have timeouts, but they probably should.
-        https://github.com/WICG/turtledove/pull/1038#issuecomment-1949342125  
-
-*/
-
-var pageURL = new URL(document.location);
-
-// {
-//     "ads": [
-//         {
-//             "metadata": "{\"sizes\":[{\"w\":468,\"h\":60}],\"ad\":{\"adomain\":[\"epsilon.com\"],\"language\":\"EN-US\",\"crid\":\"83379-40039304-0\"}}",
-//             "renderURL": "https://usadmm.dotomi.com/fetch/gs/banner/html?ig=3&company_id=83379&w=468&h=60"
-//         }
-//     ],
-//     "auctionServerRequestFlags": [],
-//     "biddingLogicURL": "https://usadmm.dotomi.com/fetch/gs/ig/bid/js?ig=3&company_id=83379&li_id=40039304",
-//     "enableBiddingSignalsPrioritization": false,
-//     "executionMode": "compatibility",
-//     "expirationTime": 1720634121.559505,
-//     "joiningOrigin": "https://www.epsilon.com",
-//     "maxTrustedBiddingSignalsURLLength": 0,
-//     "name": "3",
-//     "ownerOrigin": "https://usadmm.dotomi.com",
-//     "priority": 1,
-//     "sellerCapabilities": {
-//         "*": [
-//             "interest-group-counts",
-//             "latency-stats"
-//         ]
-//     },
-//     "trustedBiddingSignalsKeys": [
-//         "bid.3",
-//         "freqCaps.3"
-//     ],
-//     "trustedBiddingSignalsSlotSizeMode": "none",
-//     "trustedBiddingSignalsURL": "https://usadmm.dotomi.com/fetch/gs/ig/rt/bid/json",
-//     "updateURL": "https://usadmm.dotomi.com/fetch/gs/ig/update/json?ig=3&company_id=83379&li_id=40039304&form_id=6571&promo_id=1&trid=192007609868323031&utoken=AQAIvfehIOg_2gE0GZrmAQBEsgEBAQEBAQEBAQEBAQEBAQEB"
-// }
-
-//
-// See Feature detecting Protected Audience
-// https://github.com/WICG/turtledove/blob/main/PA_Feature_Detecting.md
-//
-if(typeof navigator.joinAdInterestGroup !== 'undefined') {
-
-    const updateTestIG = {
-        "name": "update-test",
-
-        "owner": "https://td.dabbs.net",
-
-        "lifetimeMs": 30 * 86400000,
-
-        /* 
-        "biddingLogicURL": "https://td.dabbs.net/static/bidding-logic.js",
-        */
-
-        /* 
-        "trustedBiddingSignalsURL": "https://td.dabbs.net/paapi/trustedBiddingSignals",
-        */
-
-        "updateURL": "https://td.dabbs.net/paapi/updateUrl?ign=update-test&inc=0"
-
-    };
-    if( ! pageURL.searchParams.has("noJoin")) {
-        const joinTestPromise =  (async function() {
-        try {
-            return await navigator.joinAdInterestGroup(updateTestIG);
-        } catch(e){
-            console.log("joinAdInterestGroup error: %o", e.message);
-        }
-        })();
-        console.log("joinAdInterestGroup result: %o", joinTestPromise);    
-    } else {
-        console.log("&noJoin specified - not (re)joining IG: " + updateTestIG.name);
-    }
-
-
-
 
     /*
         Interest group (IG) definition.
@@ -154,149 +13,21 @@ if(typeof navigator.joinAdInterestGroup !== 'undefined') {
     const interestGroup = {
         "name": "1234567890",
 
-        /* 
-            this will be Epsilon Digital, e.g. pa.dotomi.com or similar, TBD
-        */
-        "owner": "https://td.dabbs.net",
-
-        /* 30 days max IG lifetime (without re-joining the IG on some browser interaction) */
-        "lifetimeMs": 30 * 86400000, 
-
-        /* 
-            must be same origin with owner and have header Ad-Auction-Result: true. 
-            See Explainer 
-
-            16 Feb 24
-            Currently, bidder scripts obey standard HTTP caching semantics, and are always fetched from the
-            bidder's 1P network partition (Which means we basically have a single global cache - that's a leak 
-            we'll need to fix, but it should increase cache hit rate, since normally each top-level site has an 
-            entirely different network cache partition).
-            It should fully respect the standard "cache-control" directives. If that doesn't seem to be happening, 
-            we'd be happy to look at chrome://net-export logs of this happening. 
-            Instructions: https://www.chromium.org/for-testers/providing-network-details/ (Note that you need to 
-            start logging in another tab before starting an auction). Logs don't include cookies, credentials, or 
-            response bodies, but they do include requests, response, URLs, IPs, and HTTP headers 
-            (with cookies and HTTP auth redacted).
-            https://github.com/WICG/turtledove/issues/1016#issuecomment-1949326937            
-            
-            22 Feb 24
-            Multi-bid coming to PAAPI
-            https://github.com/WICG/turtledove/pull/1048
-            https://github.com/WICG/turtledove/pull/1055
-            https://chromestatus.com/feature/5095020001755136?context=myfeatures
-        */
-        "biddingLogicURL": "https://td.dabbs.net/static/bidding-logic.js",
-
+        "owner": "https://pa.igbuyer.net",
+      
         /*
-            The biddingWasmHelperURL field is optional, and lets the bidder provide computationally-expensive subroutines 
-            in WebAssembly, rather than JavaScript, to be driven from the JavaScript function provided by biddingLogicURL. 
-            If provided, it must point to a WebAssembly binary, delivered with an application/wasm mimetype. The corresponding 
-            WebAssembly.Module will be made available by the browser to the generateBid function.
-
-            must be same origin with owner and have header Ad-Auction-Result: true.
-        */
-        //"biddingWasmHelperURL": "https://td.dabbs.net..."
-
-        /* 
-            must be same origin with owner and have header Ad-Auction-Result: true.  
-            Server must include the HTTP response header `X-fledge-bidding-signals-format-version: 2`.  
-            If the server does not include the header, the response will assumed to be an in older format, 
-            where the response is only the contents of the `keys` dictionary.
-            See Explainer
-
-            Does not currently include Client Hints, but this is requested:
-            https://github.com/WICG/turtledove/issues/1031
-            https://issues.chromium.org/issues/325513778            
-
-            updateIfOlderThanMs
-            the updateIfOlderThanMs field of the trusted bidding signals response can be used to trigger a single 
-            more timely update that will run even if the last update was less than a day ago. 
-            https://github.com/WICG/turtledove/pull/1095/files?short_path=d65ba97#diff-d65ba9778fe3af46de3edfce2266b5b035192f8869280ec07179963b81f4e624
-
-            April 2024
-            Chrome team listened to community feedback and will support non-same origin TBS/TSS fetches (using CORS)
-            https://github.com/WICG/turtledove/issues/813#issuecomment-2003946175
-            https://github.com/WICG/turtledove/pull/1156/files
-            https://issues.chromium.org/issues/332913415
-
-        */
-        "trustedBiddingSignalsURL": "https://td.dabbs.net/paapi/trustedBiddingSignals",
-
-        /* 
-            The values we put here are up to us. 
-            see Explainer,
-            https://github.com/WICG/turtledove/blob/main/FLEDGE.md#31-fetching-real-time-data-from-a-trusted-server
-        */
-        "trustedBiddingSignalsKeys": [
-            "ft1-key1", 
-            "ft1-key2"
-        ],
-
-        /*
-            Background in Explainer.
-            See also this PR: https://github.com/WICG/turtledove/pull/928
-        */
-        "trustedBiddingSignalsSlotSizeMode": "none",
-        
-        /*
-            The userBiddingSignals is for storage of additional metadata that the owner can use during on-device bidding
+            userBiddingSignals is for storage of additional metadata that the owner can use during on-device bidding
         */
         "userBiddingSignals": {
             "user_bidding_signal_foo": "value"
         },
 
-        /*
-            The updateURL provides a mechanism for the group's owner to update the attributes of the interest group: 
-            any new values returned in this way overwrite the values previously stored (except that the name and owner 
-            cannot be changed, and prioritySignalsOverrides will be merged with the previous value, with null meaning a 
-            value should be removed from the interest group's old dictionary). The HTTP request will not include any metadata, 
-            so data such as the interest group name should be included within the URL. Note that the lifetime of an Interest Group 
-            is not affected by the update mechanism — ad targeting based on a person's activity on a site remains limited to 30 days 
-            after the most recent site visit.
-
-            The updates are done after auctions so as not to slow down the auctions themselves. 
-            The updates are rate limited to running at most daily to conserve resources, and timeout after 30 seconds; 
-            22 March 24
-            however, the updateIfOlderThanMs field of the trusted bidding signals response maybe be used to trigger a
-            single post-auction update that will run even if the last update was less than a day ago. 
-
-            Must be same origin with owner and have header Ad-Auction-Result: true 
-
-            More in the explainer here: https://github.com/WICG/turtledove/blob/main/FLEDGE.md#:~:text=to%20conserve%20resources.-,An%20update%20request,-only%20contains%20information
-
-            Relevant GH Discussions
-
-            Why updateURL was removed from k-anonymity requirements
-            https://github.com/WICG/turtledove/issues/361#issuecomment-1430069343
-
-            updateURL will be called even when ads[] is empty (to acommodate a 'restarted campaign' scenario)
-            https://github.com/WICG/turtledove/issues/424
-
-            26 March 24
-            updateIfOlderThanMs
-            https://github.com/WICG/turtledove/pull/1095
-            https://github.com/WICG/turtledove/commit/9d102b0d7e4977da164281893807eb2c7013349c?short_path=d65ba97#diff-d65ba9778fe3af46de3edfce2266b5b035192f8869280ec07179963b81f4e624
-        */
-
-        /*
-            ddabbs note: 
-            As a simple demonstration of the mechanism, this endpoint simply increments the &inc parameter value 
-            or the existing updateURL and echos it back as the updated updateURL IG attribute value. 
-            The first update call to the URL below returns:
-
-            {"updateURL":"https://td.dabbs.net/fledge/updateUrl?ign=1234567890&inc=1"}
-
-        */
-        "updateURL": "https://td.dabbs.net/paapi/updateUrl?ign=1234567890&inc=0",
 
         /*
             See Explainer about size related attributes.
             https://github.com/WICG/turtledove/blob/main/FLEDGE.md#:~:text=The%20adSizes%20field%20(optionally)
 
-            ddabbs note: Per Explainer, size metadata will factor into k-anonymity checks in the future 
-            (no earlier than Q1 2025). 
-            Including these attributes only to illustrate them. Although the renderURLs below reference 
-            them, they're inert in this demo. 
+            Size metadata will factor into k-anonymity checks in the future (no earlier than Q1 2025). 
         */
         "adSizes": {
             "300x250": {"width": "300", "height": "250"},
@@ -312,751 +43,143 @@ if(typeof navigator.joinAdInterestGroup !== 'undefined') {
             More attributes described here:
             https://github.com/WICG/turtledove/blob/main/FLEDGE.md#:~:text=An%20ad%20may%20also%20have%20the%20following%20optional%20properties 
 
-            ddabbs note to self: review reporting ids and allowed ROs
         */
         "ads": [
             {
                 /*
-                    Handling 'responsive' creatives
-                    https://github.com/WICG/turtledove/issues/311
+                   a hypothetical "sizeless/responsive" creative that supports Medium Rect & Leaderboard
 
-                    22 Feb 24
-                    A temporary, seller-defined macro substitution feature is coming...
-                    https://github.com/WICG/turtledove/pull/1051
+                   AD_WIDTH & AD_HEIGHT macros are native to PA (provided the buyer submits size metadata with the bid)
 
-                    9 March 24
-                    Also being discussed is a templating scheme to 
-                    "Reduce interest group payload by compressing renderURLs #1076"
-                    https://github.com/WICG/turtledove/issues/1076
-
-                    // enable_sizeless=true    
-                    "renderURL": "https://trim.cnvr.in/r/t/previewer/be54ba10?w={%AD_WIDTH%}&h={%AD_HEIGHT%}&w1=${AD_WIDTH}&h1=${AD_HEIGHT}",                "renderURL": "https://trim.cnvr.in/r/t/usadmm/168f685e?rw={%AD_WIDTH%}&rh={%AD_HEIGHT%}&rw1=${AD_WIDTH}&rh1=${AD_HEIGHT}&seller=${SELLER}&foo=%%FOO%%",
-
-                    "renderURL": "https://trim.cnvr.in/r/t/usadmm/168f685e?rw={%AD_WIDTH%}&rh={%AD_HEIGHT%}&rw1=${AD_WIDTH}&rh1=${AD_HEIGHT}&seller=${SELLER}&foo=%%FOO%%",
-
+                   Any other macros would need to be pre-arranged with sellers (who submit those key/values with the auctionConfig)
                 */
-                /* enable_sizeless=false https://trim.cnvr.in/r/t/usadmm/63f02486 */
-                "renderURL": "https://usadmm.dotomi.com/fetch/gs/banner/html?ig=3&company_id=83379&w=300&h=250&rw={%AD_WIDTH%}&rh={%AD_HEIGHT%}&rw1=${AD_WIDTH}&rh1=${AD_HEIGHT}&seller=${SELLER}&foo=%%FOO%%",
-                /*"renderURL": "https://sp-ao.shortpixel.ai/client/to_webp,q_glossy,ret_img,w_300/https://blog.snappa.com/wp-content/uploads/2023/08/medium-ad-example-300x250.jpg?w={%AD_WIDTH%}&h={%AD_HEIGHT%}&w1=${AD_WIDTH}&h1=${AD_HEIGHT}",*/
+                "renderURL": "https://imp.pa.igbuyer.net/fetch/gs/banner/html?advertiser_id=8675309&lineItem=90210&creative=63f02486&rw={%AD_WIDTH%}&rh={%AD_HEIGHT%}&rw1=${AD_WIDTH}&rh1=${AD_HEIGHT}&seller=${SELLER}&sellerAlt=%%SELLER%%",
                 "sizeGroup": "md_lb",
 
                 /* Arbitrary metadata that can be used at bidding time. */
                 "metadata": {
                     "campaign": "1234",
-                    "lineItem": "5678"
+                    "lineItem": "90210"
                 },
-                /*
-                    A list of up to 10 destination origins allowed to receive registered macro values in reporting. 
-                    https://github.com/WICG/turtledove/blob/main/Fenced_Frames_Ads_Reporting.md#registeradmacro
-                */
-                "allowedReportingOrigins": [],
 
                 /*
+                    this is the generic selectable 'channel' for Deal ids
+                    an empty string is a valid value
                 */
-                "selectableBuyerAndSellerReportingIds":[""]
+                "selectableBuyerAndSellerReportingIds":[
+                    "", 
+                    "deal123-Magnite", "deal456-Magnite", 
+                    "dealidfoo-OpenX", "dealidbar-OpenX"
+                    /* and so on for all deals across all sellers that this creative might want to target */
+                ],
+
+                /*
+                    this id, in Chrome team's conception, would provide carriage for the "Seat id"
+                    BUT it is single-valued on the creative!?
+                */
+                "buyerAndSellerReportingId": "",
+
+                "buyerReportingId": "buyer_info_stuff_for_reportWin",
+
+            }
+        ]
+
+    };
+
+    const interestGroupProposal = {
+        "name": "1234567890",
+
+        "owner": "https://pa.igbuyer.net",
+      
+        /*
+            userBiddingSignals is for storage of additional metadata that the owner can use during on-device bidding
+        */
+        "userBiddingSignals": {
+            "user_bidding_signal_foo": "value"
+        },
+
+
+        /*
+            See Explainer about size related attributes.
+            https://github.com/WICG/turtledove/blob/main/FLEDGE.md#:~:text=The%20adSizes%20field%20(optionally)
+
+            Size metadata will factor into k-anonymity checks in the future (no earlier than Q1 2025). 
+        */
+        "adSizes": {
+            "300x250": {"width": "300", "height": "250"},
+            "728x90": {"width": "728", "height": "90"}
+        },
+        "sizeGroups": {
+            "md_lb": ["300x250","728x90"]
+        },
+
+        "selectableBuyerAndSellerIdGroups": {
+            "client123":{
+                /* buyer's seat on a set of sellers representing an advertiser (or the buyer) */
+                "https://magnite.com": "seatid5678",
+                "https://openx.com": "seatid34345",
+                "https://seller.com": "seatid34345",
+                /* and so on */
             },
+            "client456":{
+                "https://magnite.com": "seatid7040",
+                "https://openx.com": "seatid60235",
+                "https://seller.com": "seatid9295",
+                /* and so on */
+            }
+        },
+
+        /*
+            The "ads" list contains the various ads that the interest group might show. Each entry is an object that must 
+            contain a `renderURL` property with the URL for the ad that would be shown.
+            More attributes described here:
+            https://github.com/WICG/turtledove/blob/main/FLEDGE.md#:~:text=An%20ad%20may%20also%20have%20the%20following%20optional%20properties 
+
+        */
+        "ads": [
             {
-                "renderURL": "https://dabbs.net/fledge/ad.html",
+                /*
+                   a hypothetical "sizeless/responsive" creative that supports Medium Rect & Leaderboard
+
+                   AD_WIDTH & AD_HEIGHT macros are native to PA (provided the buyer submits size metadata with the bid)
+
+                   Any other macros would need to be pre-arranged with sellers (who submit those key/values with the auctionConfig)
+                */
+                "renderURL": "https://imp.pa.igbuyer.net/fetch/gs/banner/html?advertiser_id=client123&lineItem=90210&creative=63f02486&rw={%AD_WIDTH%}&rh={%AD_HEIGHT%}&rw1=${AD_WIDTH}&rh1=${AD_HEIGHT}&seller=${SELLER}&sellerAlt=%%SELLER%%",
                 "sizeGroup": "md_lb",
+
+                /* Arbitrary metadata that can be used at bidding time. */
                 "metadata": {
                     "campaign": "1234",
-                    "lineItem": "5678"
-                }
-            }         
-        ],
+                    "lineItem": "90210"
+                },
 
-        /*
-            The adComponents field contains the various ad components (or "products") that can be used to construct 
-            "Ads Composed of Multiple Pieces"
-            See https://github.com/WICG/turtledove/blob/main/FLEDGE.md#34-ads-composed-of-multiple-pieces
-        */
-        // "adComponents": [...],
+                /*
+                    this is the generic selectable 'channel' for Deal ids
+                    an empty string is a valid value
+                */
+                "selectableBuyerAndSellerReportingIds":[
+                    "", 
+                    "deal123-Magnite", "deal456-Magnite", 
+                    "dealidfoo-OpenX", "dealidbar-OpenX"
+                    /* and so on for all deals across all sellers that this creative might want to target */
+                ],
 
-        /*
-            For now, it seems reasonable to grant all sellers permission to collect 
-            aggregated latency stats. 
-            See https://github.com/WICG/turtledove/blob/main/FLEDGE_extended_PA_reporting.md#reporting-per-buyer-latency-and-statistics-to-the-seller
-        */
-        "sellerCapabilities": {
-            "*": ["interest-group-counts", "latency-stats", "creative-scanning" /* proposed in https://github.com/WICG/turtledove/issues/792 */]
-        },
+                /*
+                    this id, in Chrome team's conception, would provide carriage for the "Seat id"
+                    BUT it is single-valued on the creative!?
+                */
+                "buyerAndSellerReportingId": "",
 
-        /*
-            advanced configuration options to evaluate
+                "selectableBuyerAndSellerIdGroup": "client123",
 
-        "priority": 0.0,
-        "priorityVector": {
-            "signal1": 2,
-            "signal2": -3.5,
-            ...
-        },
-        "prioritySignalsOverrides": {
-            "signal1": 4.5,
-            "signal2": 0,
-            ...
-        },
-        "enableBiddingSignalsPrioritization" : true,
+                "buyerReportingId": "buyer_info_for_reportWin_like_IG_name_lineItem_etc"
 
-        "executionMode": ...
-        */    
-    };
-    console.log("interestGroup: %o", interestGroup);
+            }
+        ]
 
-    //to test updateURL refreshing interestGroup.ads = [];
-
-    //
-    // Having defined an interest group, let's join the browser to it...
-    //
-
-    /*
-        The browser will only allow the joinAdInterestGroup() operation with the permission of both the site being visited 
-        and the group's owner. The site can allow or deny permission to any or all third parties via a Permissions-Policy 
-        (directive named "join-ad-interest-group"), where the default policy is to allow all in the top-level page and to deny 
-        all in cross-domain iframes. 
-        
-        The group's owner can indicate permission by joinAdInterestGroup() running in a page or iframe in the owner's domain, 
-        and can delegate that permission to any other domains via a .well-known URL. 
-
-        Since this call is made in https://www.mojotest.com, it succeeds because https://td.dabbs.net has implemented 
-        the PAAPI Permission Delegation .well-known endpoint.
-
-        Chrome fetches the json permissions payload (in the background, it is not visible in DevTools, Network), 
-
-            https://owner.domain/.well-known/interest-group/permissions/?origin=frame.origin
-
-               in this case, 
-
-            https://td.dabbs.net/.well-known/interest-group/permissions/?origin=www.mojotest.com
-
-        More in the Explainer here:
-        https://github.com/WICG/turtledove/blob/main/FLEDGE.md#13-permission-delegation
-
-        Google Developer post about Permissions Policy
-        https://developer.chrome.com/docs/privacy-security/permissions-policy
-    */
-
-    //
-    // Now, join the IG...
-    //
-
-    /*
-        The returned joinPromise is resolved if the group is successfully joined, 
-        and rejected with an error if the join operation fails. The error message and the resolution time must not depend on 
-        what interest groups a user is in, or any cross-origin browser state, apart from the results of the .well-known fetch, 
-        to avoid leaking any data across sites.
-    */
-    if( ! pageURL.searchParams.has("noJoin")) {
-        const joinPromise = 
-            (async function() {
-                try {
-                    // leave an old version of the IG
-                    navigator.leaveAdInterestGroup({owner: "https://td.dabbs.net", name: "fledge-test"});
-
-                    return await navigator.joinAdInterestGroup(interestGroup);
-                } catch(e){
-                    console.log("joinAdInterestGroup error: %o", e.message);
-                }
-            })();
-            console.log("joinAdInterestGroup result: %o", joinPromise);    
-    } else {
-        console.log("&noJoin specified - not (re)joining IG: " + interestGroup.name);
-    }
-
-
-    /*
-        your browser is joined to this interest group... let's run an auction!
-
-        PAAPI auctions can be structured in two ways. Single level (one seller with one or more buyers) or 
-        a "component auction," where multiple SSPs participate, with the winners of their separate auctions 
-        being passed up to another auction, run by another SSP (the top-level seller/auction).
-
-        So, for any particular Protected Audience auction, there is either a single seller and no component auctions, OR 
-        else all bids come from component auctions and the top-level auction can only choose among the component 
-        auctions' winners.
-
-        This demo will configure and run a component auction. 
-    */
-
-    const topLevelAuctionConfig = {
-        /*
-            All values specified by a top-level auction are not applied to the component auctions.
-            In the case of a component auction, all AuctionConfig parameters for that component auction are only 
-            scoped to buyer and seller scripts run as part of that auction component. 
-            When the top-level auction has component auctions, fields that affect 
-            bidder scripts have no effect, since the top-level auction has no bidders in it 
-            (e.g, perBuyerSignals, perBuyerTimeouts, perBuyerGroupLimits, etc).
-        */
-
-        /* 
-            the top-level seller is almost always going to be Google Ad Manager (GAM) 
-            since it is the ad server for 90+% of publishers
-
-            References for those interested:
-            GAM do not intend to participate as a component seller
-            https://github.com/google/ads-privacy/issues/65#issuecomment-1237767847
-
-            Protected Audience API & Ad Manager
-            https://support.google.com/admanager/answer/13627134
-
-            Google Ads blog post about PAAPI
-            https://ads-developers.googleblog.com/2023/05/last-week-chrome-announced-upcoming.html
-
-            Also:
-            Check out https://support.google.com/admanager/answer/13178817?hl=en#testing-design which describes how GAM is interacting 
-            with Chrome's labelled slices of traffic for testing. (In particular, they don't run a PA on every single page overall, 
-            but they are doing that on some of the slices of traffic.)
-
-            Google Ads's work on this stuff is at https://github.com/google/ads-privacy/.
-
-        */
-        "seller": "https://td.dabbs.net",
-
-        /* 
-            javascript code for the seller to score ads submitted by buyers. More below. 
-            NB: the -tls in this URL stands for "top-level seller" (since this is the auction config for the top-level seller)
-        */
-        "decisionLogicURL": "https://td.dabbs.net/static/decision-logic-tls.js",
-
-        /* signals used in the scoring process. More below. */
-        "trustedScoringSignalsURL": "https://td.dabbs.net/static/scoring-kv.json",
-
-        /*
-            The auctionSignals, sellerSignals values will be passed as arguments to the appropriate functions
-            that run inside those worklets — the auctionSignals are made available to everyone, while the other 
-            signals are given only to one party.
-
-            ddabbs note: Not sure what utility auctionSignals have in the top-level auction, since there are no buyers.
-                         Included for illustration.
-        */
-        "auctionSignals": {"passed": "by top-level seller"},
-
-        /* the configuration object's sellerSignals field is exclusively for passing information into scoreAd() */
-        "sellerSignals": {"whatever": "top-level (Google) passes to themselves"},
-
-        /* 
-            a secure channel for a seller to send themselves signals
-            See https://github.com/WICG/turtledove/blob/main/FLEDGE.md#25-additional-trusted-signals-directfromsellersignals
-
-            "directFromSellerSignals": "https://www.example-ssp.com/...",
-        */
-
-        /*
-            The optional requestedSize field recommends a frame size for the auction, which will be available to 
-            bidders in browser signals. This size should be specified in the same format as the sizes in the adSizes 
-            field of joinAdInterestGroup. For convenience, the returned fenced frame config will automatically populate 
-            a <fencedframe>'s width and height attributes with the requestedSize when loaded, though the element's size 
-            attributes can still be modified if you want to change the element's container size. Bidders inside the auction 
-            may pick a different content size for the ad, and that resulting size will be visually scaled to fit inside 
-            the element's container size.    
-
-            ddabbs note: Multi-size banner impression opportunities are extremely common, and can represent the majority 
-            of the banner ad slots from browser-based header bidding integrations. But a PAAPI auction has only one size. 
-            This constraint is for privacy reasons. Discussion at https://github.com/WICG/turtledove/issues/825.
-
-            How GAM selects a size:
-            https://github.com/google/ads-privacy/tree/master/proposals/fledge-multiple-seller-testing#faq
-
-        */
-        "requestedSize": {"width": "300", "height": "250"},
-
-        /*
-            Optionally, sellerTimeout can be specified to restrict the runtime (in milliseconds) of the seller's scoreAd() script,
-            If no value is specified for the seller (or a buyer timeout), a default timeout of 50 ms will be selected. 
-            Any timeout higher than 500 ms will be clamped to 500 ms.
-        */
-        "sellerTimeout": 10000,
-
-        /*
-            Optionally, reportingTimeout can be specified to restrict the runtime (in milliseconds) of the seller's reportResult()
-            and winning buyer’s reportWin() scripts. If no value is specified, a default timeout of 50 ms will be selected. 
-            Any timeout higher than 5000 ms will be clamped to 5000 ms.
-        */
-        "reportingTimeout": 5000,
-
-
-        /* 
-            Optionally, sellerCurrency is used for currency-checking. sellerCurrency also affects how currencies behave in reporting.
-            See https://github.com/WICG/turtledove/blob/main/FLEDGE.md#53-currencies-in-reporting
-
-        */
-        "sellerCurrency:" : "USD",
-
-
-        /*
-            In some cases, multiple SSPs may want to participate in an auction, with the winners of separate auctions being 
-            passed up to another auction, run by another SSP. To facilitate these "component auctions", componentAuctions 
-            can optionally contain additional auction configurations for each seller's "component auction". The winning bid 
-            of each of these "component auctions" will be passed to the "top-level" auction. How bids are scored in this case is 
-            further described in 2.4 Scoring Bids in Component Auctions. The AuctionConfig of component auctions may not have their
-            own componentAuctions. When componentAuctions is non-empty, interestGroupBuyers must be empty. That is, for any 
-            particular Protected Audience auction, either there is a single seller and no component auctions, or else all bids come 
-            from component auctions and the top-level auction can only choose among the component auctions' winners.    
-        */
-        "componentAuctions": [],
-
-        /*
-            Optionally, resolveToConfig is a boolean directing the promise returned from runAdAuction() to resolve to a FencedFrameConfig 
-            if true, for use in a <fencedframe>, or if false to an opaque urn:uuid URL, for use in an <iframe>. If resolveToConfig is not 
-            set, it defaults to false. If the window.FencedFrameConfig interface is not exposed (because e.g., the script is running in an 
-            older version of Chrome that does not yet implement FencedFrameConfig, then the auction will always yield a URN. Therefore, when 
-            requesting a FencedFrameConfig for use in a fenced frame element, you have two options:
-
-                Only pass resolveToConfig: true in if you detect that window.FencedFrameConfig != undefined, or
-                Unconditionally pass in resolveToConfig: true and check whether the auction result is a config or a URN.
-        
-            ddabbs note: this is only for top-level configs
-        */
-        "resolveToConfig": false 
     };
 
-
-    /* 
-        In Prebid, CPE will be building this config object and passing into fledgeForGPT. 
-        See https://docs.prebid.org/dev-docs/modules/fledgeForGpt.html.
-
-        If GAM decides to run a PAAPI auction, GAM will read and incorporate CPE's config
-        as a component seller within GAM's top-level auction config.
-    */
-    const componentAuctionConfig = {
-        /*
-            In the case of a component auction, all AuctionConfig parameters for that component auction are only scoped 
-            to buyer and seller scripts run as part of that auction component. Similarly, all values specified by the top-level 
-            auction are not applied to the component auction(s). When the top-level auction has component auctions, fields that affect 
-            bidder scripts have no effect, since the top-level auction has no bidders in it 
-            (e.g, perBuyerSignals, perBuyerTimeouts, perBuyerGroupLimits, etc).
-        */
-
-        /* this is CPE seller, say cpe.dotomi.com */
-        "seller": "https://td.dabbs.net",
-
-        /*
-            See Scoring Bids in Component Auctions
-            https://github.com/WICG/turtledove/blob/main/FLEDGE.md#24-scoring-bids-in-component-auctions
-
-            NB: the -cs in this URL stands for "component seller" (since this is the auction config for a component seller)
-        */
-        "decisionLogicURL": "https://td.dabbs.net/static/decision-logic-cs.js",
-
-        "trustedScoringSignalsURL": "https://td.dabbs.net/static/scoring-kv.json",
-
-        /*
-                    "https://td.dabbs.net"   
-                    "https://bsyaws073.dotomi.com"
-        */
-        "interestGroupBuyers": [
-        ],
-
-        /*
-            The auctionSignals, sellerSignals values will be passed as arguments to the appropriate functions
-            that run inside those worklets — the auctionSignals are made available to everyone 
-            (all buyers in this component auction), while the other signals are given only to one party.
-
-            ddabbs note:
-            There is a TechLab organized effort to standardize signaling within on-device PAAPI auctions.
-            Protected Audience specifies auctionSignals, metadata with bid, but these are blank slates. 
-            See a working doc here: https://docs.google.com/document/d/1tsl6mb-BNjQEFW0-cHiSt3UeZhsUaL0l6kkGjRlbElQ/edit
-
-            Recently Chrome has put forth a proposal for addressing renderURL discovery for sellers (for creative scanning, &c).
-            See this issue discussion with links to their proposal:
-            https://github.com/WICG/turtledove/issues/792
-        */
-        "auctionSignals": {
-            "passed": "by CPE seller"
-        },
-
-        /* the configuration object's sellerSignals field is exclusively for passing information into scoreAd() */
-        "sellerSignals": {
-            "whatever": "CPE wants to pass to themselves",
-        },
-
-        /* 
-            a secure channel for a seller to send themselves signals
-            See https://github.com/WICG/turtledove/blob/main/FLEDGE.md#25-additional-trusted-signals-directfromsellersignals
-
-            "directFromSellerSignals": "https://www.example-ssp.com/...",
-        */
-
-        /*
-            The optional requestedSize field recommends a frame size for the auction, which will be available to 
-            bidders in browser signals. This size should be specified in the same format as the sizes in the adSizes 
-            field of joinAdInterestGroup. For convenience, the returned fenced frame config will automatically populate 
-            a <fencedframe>'s width and height attributes with the requestedSize when loaded, though the element's size 
-            attributes can still be modified if you want to change the element's container size. Bidders inside the auction 
-            may pick a different content size for the ad, and that resulting size will be visually scaled to fit inside the 
-            element's container size.    
-
-            ddabbs note: I assume fledgeForGPT provides some means for the slot size to 
-            be configured and known by an header adaptor?
-
-            How GAM (currently) decides the slot size:
-            https://github.com/google/ads-privacy/tree/master/proposals/fledge-multiple-seller-testing#faq
-
-            https://rearc-techlab.slack.com/archives/C068L65GURY/p1716496516059259
-        */
-        "requestedSize": {"width": "300", "height": "250"},
-
-        /*
-            Optionally, sellerTimeout can be specified to restrict the runtime (in milliseconds) of the seller's scoreAd() script,
-            If no value is specified for the seller or a particular buyer, a default timeout of 50 ms will be selected. 
-            Any timeout higher than 500 ms will be clamped to 500 ms.
-        */
-        "sellerTimeout": 10000,
-
-        /* 
-            Optionally, sellerCurrency is used for currency-checking. sellerCurrency also affects how currencies behave in reporting.
-            See https://github.com/WICG/turtledove/blob/main/FLEDGE.md#53-currencies-in-reporting
-        */
-        "sellerCurrency:" : "USD",
-
-        /*
-            recent discussion how to shape traffic
-            https://github.com/WICG/turtledove/issues/951#issuecomment-1883996605
-
-            There are issues iwth auctionCOnfigs, and therefore pbs, being reused
-            https://github.com/WICG/turtledove/issues/1106
-        */
-        "perBuyerSignals": {
-            /* CPE will set this key and value from biddy (or other buyers') auction intent response extension */
-            "https://td.dabbs.net": {
-                "trid": "912345678901234123",
-                "currency": "USD",                
-                "seat": "dotomi",
-                "sellerId": "seller123",
-                "siteId": "site123",
-                "utoken": "ABC234_ACDF0x10CRLF"
-            },
-            "https://usadmm.dotomi.com": {
-                "tr_id": "912345678901234123",
-                "currency": "USD",                
-                "seat": "dotomi",
-                "sellerId": "seller123",
-                "siteId": "site123",
-                "utoken": "ABC234_ACDF0x10CRLF"
-            },
-            "https://cookieless-campaign.prd-00.retargetly.com": {
-                "trid": "912345678901234123",
-                "currency": "USD",                
-                "seat": "dotomi",
-                "sellerId": "seller123",
-                "siteId": "site123",
-                "utoken": "ABC234_ACDF0x10CRLF"
-            }                        
-        },
-
-        /*
-            April 2024
-            Optionally, reportingTimeout can be specified to restrict the runtime (in milliseconds) of the seller's reportResult() and 
-            winning buyer’s reportWin() scripts. If no value is specified, a default timeout of 50 ms will be selected. 
-            Any timeout higher than 5000 ms will be clamped to 5000 ms.
-            https://github.com/WICG/turtledove/pull/1101/files?short_path=d65ba97#diff-d65ba9778fe3af46de3edfce2266b5b035192f8869280ec07179963b81f4e624
-
-            ddabbs note: Sellers' and buyers' reporting scripts (reportResult and reportWin, respectively) are hard
-            coded to 50ms timeouts. There is recent discussion of either increasing this timeout, possibly providing control.
-            These callbacks are how we get paid, so they should fire without fail. 
-            Discussion https://docs.google.com/document/d/1Kr0hpfQ_Q1LX1aN00D5k_09yV_a7WE9RSn69nS3nZho/edit#bookmark=id.aedfdn2x6jj
-            about issue #959 https://github.com/WICG/turtledove/issues/959.
-
-            See also reportingTimeout
-            https://github.com/WICG/turtledove/pull/1101/files?short_path=d65ba97#diff-d65ba9778fe3af46de3edfce2266b5b035192f8869280ec07179963b81f4e624
-            https://chromestatus.com/feature/5095020001755136?context=myfeatures
-            
-        */
-        "reportingTimeout" : 5000,
-
-        /* No need for this when perBuyerCumulativeTimeouts is available 
-        "perBuyerTimeouts": {
-            "https://td.dabbs.net": 500,
-            "*": 150
-        },
-        
-
-        /* 
-           Impl ticket: https://issues.chromium.org/issues/40257176
-        */
-        "perBuyerCumulativeTimeouts": {
-            "*": 700
-        },
-        
-
-        /* CPE would not limit Epsilon DSP buyer
-        "perBuyerGroupLimits": {
-            "https://www.example-dsp.com": 2,
-            "https://www.another-buyer.com": 1000,
-            "*": 15,
-        },
-        */
-
-        /*
-            'perBuyerPrioritySignals': {
-                'https://www.example-dsp.com': {'signal1': 2.5, 'signal2': 2.5},
-                'https://www.another-buyer.com': {},
-                '*': {}
-            },
-
-            'perBuyerExperimentGroupIds': {
-                'https://www.example-dsp.com': 234,
-                'https://www.another-buyer.com': 345,
-                '*': 456
-            },
-
-            'perBuyerCurrencies': {
-                'https://example.co.uk': 'GBP',
-                'https://example.fr': 'EUR',
-                '*': 'USD'
-            },
-
-            // See March 2024 
-            'perBuyerMultiBidLimits': {
-                'https://example.co.uk': '5',
-                'https://example.fr': '4',
-                '*': '2'
-            },
-
-        */
-
-
-        /*
-            Sellers might want to only score bids from interest groups that will share aggregate statistics, so a field, 
-            requiredSellerCapabilities will also be added to the auction config. Any interest group that doesn't permit 
-            (for the auction's seller) all the sellerCapabilities listed in requiredSellerCapabilities will not participate in the auction.
-
-            See https://github.com/WICG/turtledove/blob/main/FLEDGE_extended_PA_reporting.md#reporting-per-buyer-latency-and-statistics-to-the-seller
-
-        "requiredSellerCapabilities": ["interest-group-counts", "latency-stats"]
-
-        */
-
-        /*
-            seller-supplied macros Chrome will replace in winning renderURLs
-
-            deprecatedRenderURLReplacements
-            Optionally, deprecatedRenderURLReplacements can be specified to allow replacing macros within the URN or src of the FencedFrameConfig returned by runAdAuction. 
-            These replacements must be in the format of ${...} or %%...%%. The mapping specified here works similar to the second parameter of navigator.deprecatedReplaceInURN(), 
-            but within the auction config. This allows for replacements within top level seller auction configs where there are no component seller auction configs, or within 
-            component auction configs.
-
-            3 April 24
-            the Chrome feature flag --enable-features=FledgeDeprecatedRenderURLReplacements needs to be enabled for this to work.
-
-            https://github.com/WICG/turtledove/issues/286            
-            https://issues.chromium.org/issues/325990067 
-        */
-        "deprecatedRenderURLReplacements":{
-            "${SELLER}":"xxx", "%%FOO%%": "foo"
-        }
-    };
-
-    // read buyers overrides from location.hash
-    if(document.location.hash.length > 1) {
-
-        let hashVal = decodeURIComponent(document.location.hash.substring(1));
-
-        if(hashVal.charAt(0) == '{') {
-            try {
-                let hashObj = JSON.parse(hashVal);
-                for(var key in hashObj) {
-                    if(key.startsWith('https://')) {
-                        componentAuctionConfig.interestGroupBuyers.push(key);
-                        componentAuctionConfig.perBuyerSignals[key] = hashObj[key];
-                    }
-                }
-                
-            } catch(e) {
-
-            }
-        }
-    }
-
-
-    //
-    // set component seller's reject reason from parameter
-    //
-    if(pageURL.searchParams.has("resolveToConfig")) {
-        topLevelAuctionConfig.resolveToConfig = (pageURL.searchParams.get("resolveToConfig") == "true");
-    }
-
-    if(pageURL.searchParams.has("rejectReason")) {
-        componentAuctionConfig.sellerSignals.rejectReason = pageURL.searchParams.get("rejectReason");
-    }
-
-    var requestedWidth = "300", requestedHeight = "250";
-    if(pageURL.searchParams.has("requestedSize")) {
-        let requestedSizeParam = pageURL.searchParams.get("requestedSize");
-        let rsArray = requestedSizeParam.split('x');
-
-        requestedWidth = rsArray[0];
-        requestedHeight = rsArray[1];
-
-    }
-
-    // assumes NO https://
-    // &interestGroupBuyers=td.dabbs.net,...
-    //
-    if(pageURL.searchParams.has("interestGroupBuyers")) {
-        var buyers = pageURL.searchParams.get("interestGroupBuyers").split(',');
-        for(const element of buyers) {
-            const buyer = "https://" + element;
-
-            if(! componentAuctionConfig.interestGroupBuyers.includes(buyer)) {
-                console.log(`Adding component auction buyer: ${buyer}.`);
-                componentAuctionConfig.interestGroupBuyers.push(buyer);
-            }
-
-        }
-    }
-
-    if(pageURL.searchParams.has("perBuyerCumulativeTimeouts")) {
-        var pbcto = pageURL.searchParams.get("perBuyerCumulativeTimeouts");
-        console.log(`Setting perBuyerCumulativeTimeouts['*'] = ${pbcto}.`);
-        componentAuctionConfig.perBuyerCumulativeTimeouts['*'] = pbcto;
-    }
-
-    if(componentAuctionConfig.interestGroupBuyers.length == 0) {
-        componentAuctionConfig.interestGroupBuyers.push("https://usadmm.dotomi.com");
-    }       
-
-    topLevelAuctionConfig.requestedSize = componentAuctionConfig.requestedSize = {"width": requestedWidth, "height": requestedHeight};
-
-    
-
-    /*
-        CPE passes its component auction config to the top-level seller via fledgeForGPT
-    */
-    topLevelAuctionConfig.componentAuctions.push(componentAuctionConfig);
-
-    console.log("topLevelAuctionConfig: %o", topLevelAuctionConfig);
-    console.log("componentAuctionConfig: %o", componentAuctionConfig);
-
-    /*
-        GAM, or whoever, runs PAAPIwith a call to navigator.runAdAuction()
-    */
-    (async function() {
-
-    try {
-
-        const raaResult = await navigator.runAdAuction(topLevelAuctionConfig);
-
-        if( raaResult ) {
-
-            // see https://github.com/WICG/turtledove/blob/main/Proposed_First_FLEDGE_OT_Details.md#advertisement-rendering
-            try {
-                var renderURLRaw = null;
-                function successCB(result){
-                    renderURLRaw = result;
-                    console.log("renderURL from deprecatedURNToURL()", result);
-                }
-                let renderURL = navigator.deprecatedURNToURL(raaResult/*, true*/);
-                renderURL.then(successCB);
-
-            } catch(e) {
-                console.log("error renderURL from deprecatedURNToURL", e);
-            }
-
-        /*
-            #### 7.2 navigator.deprecatedReplaceInURN()
-            To help with ease of adoption, [until at least 2026](https://github.com/WICG/turtledove/issues/286#issuecomment-1682842636) Protected Audience will support the `navigator.deprecatedReplaceInURN()` API.
-            It takes two parameters:
-            *   The return value from `runAdAuction()`, which is either a `urn:uuid` string, or a [`FencedFrameConfig`](https://github.com/WICG/fenced-frame/blob/master/explainer/fenced_frame_config.md) object.
-            *   A mapping from strings to strings. The keys are strings to be replaced, which must start and end with either "${" and "}" or "%%" and "%%". The values are strings to substitute the keys.
-
-            It modifies the underlying URL from a URN returned from `runAdAuction()` by replacing substrings specified as pairs in the replacements list. The true URLs for any component ads associated with this URN will also have substrings substituted.
-
-                const result = await navigator.runAdAuction(myAuctionConfig);
-                await navigator.deprecatedReplaceInURN(result, 
-                   {'${INTEREST_GROUP_NAME}': 'render_cars', '%%echo%%': 'echo'});
-                
-        */
-            const frametype = (topLevelAuctionConfig.resolveToConfig) ? 'fencedframe' : 'iframe';
-            console.debug(`display ads in <${frametype}>`);
-            const $iframe = document.createElement(frametype);
-            $iframe.setAttribute('scrolling','no')
-            $iframe.style = `border:2px dotted black; width:${requestedWidth}px; height:${requestedHeight}px`;
-            if (frametype === 'fencedframe') {
-                $iframe.mode = 'opaque-ads';
-                $iframe.config = raaResult;
-            } else {
-                $iframe.src = raaResult;
-            }
-            document.getElementById("adslot").appendChild($iframe);
-        } else {
-            // no winner produced
-        }
-
-    } catch(e) {
-        console.log("auction error caught: %o", e);
-    }
-
-    })();
-
-
-
-    // If `result` is a `FencedFrameConfig` object, it must be used with a fenced frame
-    // element via its `config` attribute. Otherwise, it's a `urn:uuid` for an iframe.
-    //if (window.FencedFrameConfig && result instanceof FencedFrameConfig) {
-    //    fencedFrame.config = result;
-    //}
-    //else {
-        //iframe.src = result;
-    //}
-
-} else {
-    console.log("No PAAPI - typeof navigator.joinAdInterestGroup == 'undefined'");
-}
-    </script>
-
-<!-- 
-    <script async="async" src="https://www.googletagservices.com/tag/js/gpt.js"></script>
-    <script>
-        var googletag = googletag || {};
-        googletag.cmd = googletag.cmd || [];
-    </script>
- -->
-
- <!-- *****************************************************  -->
- <style>
-    /* https://github.com/lonekorean/gist-syntax-themes */
-    @import url('https://cdn.rawgit.com/lonekorean/gist-syntax-themes/d49b91b3/stylesheets/idle-fingers.css');
-    
-    @import url('https://fonts.googleapis.com/css?family=Open+Sans');
-    body {
-      font: 18px 'Open Sans', sans-serif;
-    }
-    body .gist .gist-file {
-      border-color: #555 #555 #444
-    }
-    body .gist .gist-data {
-      border-color: #555
-    }
-    body .gist .gist-meta {
-      color: #ffffff;
-      background: #373737; 
-    }
-    body .gist .gist-meta a {
-      color: #ffffff
-    }
-    body .gist .gist-data .pl-s .pl-s1 {
-      color: #a5c261
-    }
-    </style>
-    <script src="https://gist.github.com/dmdabbs/82bcd9f627999e9c80718d2e0520623d.js"></script>
-
-    <br>
-    <br>
-    <hr>
-    <script src="https://gist.github.com/dmdabbs/7ed9da3ddfc334ac48e0e6fbca74f672.js"></script>
-    <br>
-    <br>
-
-    <script>
-        /*
-        Join-Ad-Interest-Group: owner=%"https://www.example-dsp.com", name=%"womens-running-shoes", lifetimeMs=2592000000, updateURL=%"https://www.example-dsp.com/update?ign=womens-running-shoes&et=cetera" 
-        userBiddingSignals
-        
-const myGroup = {
-  'trustedBiddingSignalsURL': ...,
-  'trustedBiddingSignalsKeys': ['key1', 'key2'],
-  'userBiddingSignals': {...},
-  */
 </script>
 </body>
 </html>
